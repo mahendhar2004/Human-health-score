@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Health Risk Predictor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for creating graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .form-input, .form-select {
+            transition: all 0.3s ease;
+            font-size: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            background-color: #f8fafc;
+        }
+        .form-input:focus, .form-select:focus {
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+            outline: none;
+        }
+        .btn-predict, .btn-download, .btn-autofill {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        .btn-predict:hover, .btn-download:hover, .btn-autofill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.2), 0 4px 6px -2px rgba(79, 70, 229, 0.1);
+        }
+        .btn-predict:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        .stagger-item {
+            opacity: 0;
+            transform: translateX(-20px);
+            animation: slideIn 0.5s ease-out forwards;
+        }
+        @keyframes slideIn {
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .gauge {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+        .gauge-bg, .gauge-fill {
+            fill: none;
+            stroke-width: 20;
+            transform: rotate(-90deg 100px 100px);
+        }
+        .gauge-bg { stroke: #e5e7eb; }
+        .gauge-fill {
+            stroke: #4f46e5;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.23, 1, 0.32, 1), stroke 1s ease;
+        }
+        .gauge-text { font-size: 3rem; font-weight: 700; }
+        .gauge-label { font-size: 1rem; font-weight: 500; fill: #6b7280; }
+        .report-section {
+            display: none; /* Hide all report sections initially */
+        }
+    </style>
+</head>
+<body class="text-gray-900 bg-gradient-to-br from-purple-100 via-indigo-100 to-purple-200">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-screen-lg">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl sm:text-5xl font-bold text-gray-900">Comprehensive Health Analysis</h1>
+            <p class="mt-4 text-lg text-gray-600">An advanced tool for health risk assessment based on your key metrics.</p>
+        </header>
+
+        <main class="space-y-8">
+            <!-- Section 1: Input Form -->
+            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200 fade-in">
+                <h2 class="text-2xl font-semibold mb-6 border-b pb-4">Enter Your Health Information</h2>
+                <form id="health-form" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+                    
+                    <div class="md:col-span-2 lg:col-span-3 font-semibold text-lg text-gray-700 border-b pb-2 mb-2">Personal Details</div>
+                    <div>
+                        <label for="patientName" class="block text-sm font-medium text-gray-700 mb-2">Patient Name</label>
+                        <input type="text" id="patientName" class="form-input w-full" required placeholder="e.g., Priya Sharma">
+                    </div>
+                    <div>
+                        <label for="age" class="block text-sm font-medium text-gray-700 mb-2">Age</label>
+                        <input type="number" id="age" min="0" class="form-input w-full" required placeholder="40">
+                    </div>
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                        <select id="gender" class="form-select w-full"><option value="1">Male</option><option value="0">Female</option></select>
+                    </div>
+                    <div>
+                        <label for="height(cm)" class="block text-sm font-medium text-gray-700 mb-2">Height (cm)</label>
+                        <input type="number" id="height(cm)" min="0" class="form-input w-full" required placeholder="175">
+                    </div>
+                    <div>
+                        <label for="weight(kg)" class="block text-sm font-medium text-gray-700 mb-2">Weight (kg)</label>
+                        <input type="number" id="weight(kg)" min="0" class="form-input w-full" required placeholder="60">
+                    </div>
+                    <div>
+                        <label for="waist(cm)" class="block text-sm font-medium text-gray-700 mb-2">Waistline (cm)</label>
+                        <input type="number" id="waist(cm)" min="0" class="form-input w-full" required placeholder="56">
+                    </div>
+
+                    <div class="md:col-span-2 lg:col-span-3 font-semibold text-lg text-gray-700 border-b pb-2 mt-4 mb-2">Vitals & Lab Results</div>
+                    <div>
+                        <label for="systolic" class="block text-sm font-medium text-gray-700 mb-2">Systolic BP</label>
+                        <input type="number" id="systolic" min="0" class="form-input w-full" required placeholder="120">
+                    </div>
+                    <div>
+                        <label for="relaxation" class="block text-sm font-medium text-gray-700 mb-2">Diastolic BP</label>
+                        <input type="number" id="relaxation" min="0" class="form-input w-full" required placeholder="70">
+                    </div>
+                    <div>
+                        <label for="fasting blood sugar" class="block text-sm font-medium text-gray-700 mb-2">Fasting Blood Sugar</label>
+                        <input type="number" id="fasting blood sugar" min="0" class="form-input w-full" required placeholder="90">
+                    </div>
+                    <div>
+                        <label for="hemoglobin" class="block text-sm font-medium text-gray-700 mb-2">Hemoglobin</label>
+                        <input type="number" id="hemoglobin" min="0" step="0.1" class="form-input w-full" required placeholder="15.8">
+                    </div>
+                    <div>
+                        <label for="serum creatinine" class="block text-sm font-medium text-gray-700 mb-2">Serum Creatinine</label>
+                        <input type="number" id="serum creatinine" min="0" step="0.1" class="form-input w-full" required placeholder="1.1">
+                    </div>
+                    <div>
+                        <label for="gamma-GTP" class="block text-sm font-medium text-gray-700 mb-2">Gamma-GTP</label>
+                        <input type="number" id="gamma-GTP" min="0" class="form-input w-full" required placeholder="102">
+                    </div>
+                    <div>
+                        <label for="triglyceride" class="block text-sm font-medium text-gray-700 mb-2">Triglyceride</label>
+                        <input type="number" id="triglyceride" min="0" class="form-input w-full" required placeholder="120">
+                    </div>
+                    <div>
+                        <label for="HDL_chole" class="block text-sm font-medium text-gray-700 mb-2">HDL Cholesterol</label>
+                        <input type="number" id="HDL_chole" min="0" class="form-input w-full" required placeholder="50">
+                    </div>
+                    <div>
+                        <label for="LDL_chole" class="block text-sm font-medium text-gray-700 mb-2">LDL Cholesterol</label>
+                        <input type="number" id="LDL_chole" min="0" class="form-input w-full" required placeholder="100">
+                    </div>
+                    <div>
+                        <label for="urine_protein" class="block text-sm font-medium text-gray-700 mb-2">Urine Protein</label>
+                        <input type="number" id="urine_protein" min="1" max="6" class="form-input w-full" required placeholder="1">
+                    </div>
+                    <div>
+                        <label for="SGOT_AST" class="block text-sm font-medium text-gray-700 mb-2">AST</label>
+                        <input type="number" id="SGOT_AST" min="0" class="form-input w-full" required placeholder="25">
+                    </div>
+                    <div>
+                        <label for="SGOT_ALT" class="block text-sm font-medium text-gray-700 mb-2">ALT</label>
+                        <input type="number" id="SGOT_ALT" min="0" class="form-input w-full" required placeholder="30">
+                    </div>
+                    
+                    <div class="md:col-span-2 lg:col-span-3 mt-6 grid grid-cols-2 gap-4">
+                        <button type="button" id="autofill-button" class="btn-autofill w-full bg-purple-500 text-white font-semibold py-4 px-4 rounded-lg shadow-md text-lg">Auto-fill Demo Data</button>
+                        <button type="submit" id="predict-button" class="btn-predict w-full bg-indigo-600 text-white font-semibold py-4 px-4 rounded-lg shadow-md text-lg">
+                            <span id="button-text">Analyze My Health</span>
+                            <span id="button-loader" class="hidden">Analyzing...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Placeholder for results -->
+            <div id="results-placeholder" class="bg-white/70 backdrop-blur-sm text-center text-gray-500 p-8 rounded-2xl shadow-xl border border-gray-200">
+                <svg class="mx-auto h-24 w-24 text-indigo-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.286zm0 13.036h.008v.008H12v-.008z" /></svg>
+                <h3 class="mt-4 text-2xl font-medium text-gray-900">Your Health Report</h3>
+                <p class="mt-2 text-base text-gray-500">Submit your data to generate the analysis.</p>
+            </div>
+
+            <!-- Step 1: Score & Predictions -->
+            <div id="summary-card" class="report-section bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200">
+                <div class="text-center">
+                    <h3 class="text-2xl font-semibold mb-4 text-gray-800">Overall Health Score & Risk Predictions</h3>
+                    <div class="gauge mx-auto">
+                        <svg viewBox="0 0 200 200" class="w-full h-full">
+                            <circle class="gauge-bg" cx="100" cy="100" r="90"></circle>
+                            <circle id="gauge-fill" class="gauge-fill" cx="100" cy="100" r="90" pathLength="100"></circle>
+                            <text id="gauge-text" class="gauge-text" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">0</text>
+                            <text class="gauge-label" x="50%" y="68%" dominant-baseline="middle" text-anchor="middle">out of 100</text>
+                        </svg>
+                    </div>
+                    <p id="score-interpretation" class="mt-4 text-lg font-medium text-gray-600"></p>
+                    <div class="grid grid-cols-2 gap-4 mt-8 pt-6 border-t text-center">
+                        <div>
+                            <h4 class="text-md font-medium text-gray-500 mb-1">Smoking Risk</h4>
+                            <p id="smoking-result" class="text-xl font-bold"></p>
+                        </div>
+                        <div>
+                            <h4 class="text-md font-medium text-gray-500 mb-1">Drinking Risk</h4>
+                            <p id="drinking-result" class="text-xl font-bold"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Key Risk Factors Chart -->
+            <div id="risk-factors-card" class="report-section bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Key Risk Factors Analysis</h3>
+                <div id="bar-chart-container" class="relative h-96 w-full">
+                    <canvas id="riskFactorsBarChart"></canvas>
+                </div>
+                <div id="no-risks-message" class="hidden text-center text-gray-500 p-8">
+                    <svg class="mx-auto h-16 w-16 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h4 class="mt-4 text-xl font-medium text-gray-900">All Clear!</h4>
+                    <p class="mt-2 text-base">Your key risk factors are all within the normal range.</p>
+                </div>
+            </div>
+
+            <!-- Step 3: Detailed Metric Analysis -->
+            <div id="details-card" class="report-section bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Detailed Health Profile</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div class="relative h-96 w-full">
+                       <canvas id="healthRadarChart"></canvas>
+                    </div>
+                    <div>
+                        <ul id="metric-details" class="space-y-3"></ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 4: Personalized Insights -->
+            <div id="insights-card" class="report-section bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-800">Personalized Insights & Recommendations</h3>
+                <ul id="health-insights" class="space-y-4"></ul>
+            </div>
+
+            <!-- Step 5: Download Button -->
+            <div id="download-card" class="report-section text-center">
+                 <button id="download-button" class="btn-download bg-green-600 text-white font-semibold py-4 px-8 rounded-lg shadow-md text-lg">
+                    Download Full Report (PDF)
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Ensure jsPDF is loaded
+        window.jsPDF = window.jspdf.jsPDF;
+        let fullReportData = null; // Variable to store the full report
+
+        const healthForm = document.getElementById('health-form');
+        const resultsPlaceholder = document.getElementById('results-placeholder');
+        const summaryCard = document.getElementById('summary-card');
+        const riskFactorsCard = document.getElementById('risk-factors-card');
+        const detailsCard = document.getElementById('details-card');
+        const insightsCard = document.getElementById('insights-card');
+        const downloadCard = document.getElementById('download-card');
+        const downloadButton = document.getElementById('download-button');
+        const predictButton = document.getElementById('predict-button');
+        const autofillButton = document.getElementById('autofill-button');
+        const buttonText = document.getElementById('button-text');
+        const buttonLoader = document.getElementById('button-loader');
+        
+        const gaugeFill = document.getElementById('gauge-fill');
+        const gaugeText = document.getElementById('gauge-text');
+        const scoreInterpretation = document.getElementById('score-interpretation');
+        const smokingResultElem = document.getElementById('smoking-result');
+        const drinkingResultElem = document.getElementById('drinking-result');
+        const metricDetailsElem = document.getElementById('metric-details');
+        const healthInsightsElem = document.getElementById('health-insights');
+        
+        const radarCanvas = document.getElementById('healthRadarChart');
+        let healthRadarChart = null;
+        const barCanvas = document.getElementById('riskFactorsBarChart');
+        let riskFactorsBarChart = null;
+        const barChartContainer = document.getElementById('bar-chart-container');
+        const noRisksMessage = document.getElementById('no-risks-message');
+
+        const featureNames = [
+            'age', 'gender', 'height(cm)', 'weight(kg)', 'waist(cm)', 'systolic', 'relaxation', 
+            'fasting blood sugar', 'HDL_chole', 'LDL_chole', 'triglyceride', 'hemoglobin', 
+            'urine_protein', 'serum creatinine', 'SGOT_AST', 'SGOT_ALT', 'gamma-GTP'
+        ];
+
+        const METRIC_THRESHOLDS = {
+            bmi: { range: [18.5, 24.9], penalty: 10 },
+            sbp: { range: [90, 120], penalty: 10 },
+            dbp: { range: [60, 80], penalty: 10 },
+            blds: { range: [70, 100], penalty: 10 },
+            hdl_chole: { range: [40, 100], penalty: 8 }, // Penalty for being too low
+            ldl_chole: { range: [0, 130], penalty: 10 }, // Penalty for being too high
+            triglyceride: { range: [0, 150], penalty: 8 },
+            hemoglobin: { male: [13.5, 17.5], female: [12.0, 15.5], penalty: 5 },
+            urine_protein: { range: [1, 1], penalty: 10 }, // Normal is exactly 1
+            serum_creatinine: { male: [0.7, 1.2], female: [0.5, 1.0], penalty: 7 },
+            sgot_ast: { range: [5, 40], penalty: 7 },
+            sgot_alt: { range: [7, 56], penalty: 7 },
+            gamma_gtp: { range: [0, 55], penalty: 12 }
+        };
+
+        healthForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            setLoading(true);
+            [summaryCard, riskFactorsCard, detailsCard, insightsCard, downloadCard].forEach(card => card.style.display = 'none');
+
+            const inputs = { patientName: document.getElementById('patientName').value };
+            featureNames.forEach(name => {
+                const element = document.getElementById(name);
+                if (element.step === '0.1') {
+                    inputs[name] = parseFloat(element.value) || 0;
+                } else {
+                    inputs[name] = parseInt(element.value, 10) || 0;
+                }
+            });
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs),
+                });
+                if (!response.ok) throw new Error(`Prediction server error! status: ${response.status}`);
+                const report = await response.json();
+                
+                fullReportData = generateFullReport(inputs, report);
+                resultsPlaceholder.classList.add('hidden');
+                displayReportSequentially(fullReportData);
+
+            } catch (error) {
+                console.error("Error during analysis:", error);
+                alert("Could not connect to the analysis server. Please ensure the 'app.py' backend is running and try again.");
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        autofillButton.addEventListener('click', () => {
+            const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+            const randomFloat = (min, max, decimals) => (Math.random() * (max - min) + min).toFixed(decimals);
+
+            const maleNames = ['Arjun', 'Rohan', 'Vikram', 'Aditya', 'Sameer'];
+            const femaleNames = ['Priya', 'Anjali', 'Sneha', 'Meera', 'Aisha'];
+            const gender = randomInt(0, 1);
+            
+            document.getElementById('patientName').value = gender === 1 ? maleNames[randomInt(0,4)] : femaleNames[randomInt(0,4)];
+            document.getElementById('gender').value = gender;
+            document.getElementById('age').value = randomInt(25, 65);
+            document.getElementById('height(cm)').value = gender === 1 ? randomInt(165, 185) : randomInt(150, 170);
+            document.getElementById('weight(kg)').value = randomInt(55, 95);
+            document.getElementById('waist(cm)').value = randomInt(75, 105);
+            document.getElementById('systolic').value = randomInt(110, 150);
+            document.getElementById('relaxation').value = randomInt(70, 95);
+            document.getElementById('fasting blood sugar').value = randomInt(80, 160);
+            document.getElementById('hemoglobin').value = gender === 1 ? randomFloat(13.5, 17.0, 1) : randomFloat(12.0, 15.5, 1);
+            document.getElementById('serum creatinine').value = gender === 1 ? randomFloat(0.7, 1.2, 1) : randomFloat(0.5, 1.0, 1);
+            document.getElementById('gamma-GTP').value = randomInt(15, 130);
+            document.getElementById('triglyceride').value = randomInt(80, 220);
+            document.getElementById('HDL_chole').value = randomInt(30, 80);
+            document.getElementById('LDL_chole').value = randomInt(90, 190);
+            document.getElementById('urine_protein').value = randomInt(1, 3);
+            document.getElementById('SGOT_AST').value = randomInt(15, 60);
+            document.getElementById('SGOT_ALT').value = randomInt(10, 70);
+        });
+
+        downloadButton.addEventListener('click', () => {
+            if (fullReportData) {
+                generatePDF(fullReportData);
+            }
+        });
+
+        function setLoading(isLoading) {
+            predictButton.disabled = isLoading;
+            buttonText.style.display = isLoading ? 'none' : 'inline';
+            buttonLoader.style.display = isLoading ? 'inline' : 'none';
+        }
+        
+        function generateFullReport(localInputs, backendReport) {
+            let healthScore = 100;
+            const metricAnalysis = [];
+            
+            const bmi = localInputs['weight(kg)'] / ((localInputs['height(cm)'] / 100) ** 2);
+            const bmiStatus = checkMetric('bmi', bmi, localInputs.gender);
+            metricAnalysis.push({ name: 'BMI', value: bmi.toFixed(1), unit: '', ...bmiStatus });
+            if (!bmiStatus.inRange) healthScore -= 10;
+
+            const metricMap = {
+                'systolic': 'sbp', 'relaxation': 'dbp', 'fasting blood sugar': 'blds', 
+                'HDL_chole': 'hdl_chole', 'LDL_chole': 'ldl_chole', 'triglyceride': 'triglyceride',
+                'hemoglobin': 'hemoglobin', 'urine_protein': 'urine_protein', 
+                'serum creatinine': 'serum_creatinine', 'SGOT_AST': 'sgot_ast', 
+                'SGOT_ALT': 'sgot_alt', 'gamma-GTP': 'gamma_gtp'
+            };
+
+            for (const [inputName, thresholdName] of Object.entries(metricMap)) {
+                const status = checkMetric(thresholdName, localInputs[inputName], localInputs.gender);
+                metricAnalysis.push({ name: inputName.replace(/\(cm\)| \(kg\)|/g, '').replace(/(^\w|\s\w)/g, m => m.toUpperCase()), value: localInputs[inputName], unit: '', ...status });
+                if (!status.inRange) healthScore -= METRIC_THRESHOLDS[thresholdName].penalty;
+            }
+            
+            if(backendReport.smokingPrediction.isRisk) healthScore -= 5;
+            if(backendReport.drinkingPrediction.isRisk) healthScore -= 5;
+
+            healthScore = Math.max(0, Math.round(healthScore));
+
+            return { healthScore, ...backendReport, metricAnalysis, patientName: localInputs.patientName, age: localInputs.age };
+        }
+
+        function checkMetric(metric, value, gender) {
+            const def = METRIC_THRESHOLDS[metric];
+            let range = def.range;
+            if (metric === 'hemoglobin' || metric === 'serum_creatinine') {
+                range = gender === 1 ? def.male : def.female;
+            }
+            
+            const [min, max] = range;
+            let inRange = value >= min && value <= max;
+            if (metric === 'hdl_chole') { // HDL is better when high
+                inRange = value >= min;
+            }
+
+            let status, normalizedScore;
+
+            if (inRange) {
+                status = 'Normal';
+                normalizedScore = 100;
+            } else {
+                status = value < min ? 'Low' : 'High';
+                normalizedScore = 50; // Simplified for out of range
+            }
+            return { inRange, status, normalizedScore: Math.max(0, Math.min(100, normalizedScore)), normalRange: range };
+        }
+
+        async function displayReportSequentially(report) {
+            // Step 1
+            summaryCard.style.display = 'block';
+            summaryCard.classList.add('fade-in');
+            displayScoreAndPredictions(report);
+            await new Promise(res => setTimeout(res, 600));
+
+            // Step 2
+            riskFactorsCard.style.display = 'block';
+            riskFactorsCard.classList.add('fade-in');
+            createOrUpdateBarChart(report.metricAnalysis);
+            await new Promise(res => setTimeout(res, 600));
+
+            // Step 3
+            detailsCard.style.display = 'block';
+            detailsCard.classList.add('fade-in');
+            displayMetricDetails(report.metricAnalysis);
+            createOrUpdateRadarChart(report.metricAnalysis);
+            await new Promise(res => setTimeout(res, 600));
+            
+            // Step 4
+            insightsCard.style.display = 'block';
+            insightsCard.classList.add('fade-in');
+            displayInsights(report.insights, report.metricAnalysis);
+            await new Promise(res => setTimeout(res, 600));
+
+            // Step 5
+            downloadCard.style.display = 'block';
+            downloadCard.classList.add('fade-in');
+        }
+
+        function displayScoreAndPredictions(report) {
+            let scoreColor, interpretationText;
+            if (report.healthScore >= 80) {
+                scoreColor = '#10b981'; interpretationText = 'Excellent';
+            } else if (report.healthScore >= 60) {
+                scoreColor = '#f59e0b'; interpretationText = 'Good';
+            } else {
+                scoreColor = '#ef4444'; interpretationText = 'Needs Improvement';
+            }
+            gaugeFill.style.stroke = scoreColor;
+            gaugeText.style.fill = scoreColor;
+            scoreInterpretation.textContent = interpretationText;
+            scoreInterpretation.style.color = scoreColor;
+            
+            const circumference = 2 * Math.PI * 90;
+            const offset = circumference - (report.healthScore / 100) * circumference;
+            gaugeFill.style.strokeDasharray = circumference;
+            gaugeFill.style.strokeDashoffset = offset;
+            
+            let currentScore = 0;
+            const interval = setInterval(() => {
+                if (currentScore >= report.healthScore) {
+                    clearInterval(interval);
+                    gaugeText.textContent = report.healthScore;
+                } else { currentScore++; gaugeText.textContent = currentScore; }
+            }, 1500 / (report.healthScore || 1));
+
+            smokingResultElem.innerHTML = `${report.smokingPrediction.isRisk ? 'High Risk' : 'Low Risk'} <span class="text-sm text-gray-500">(${report.smokingPrediction.probability.toFixed(1)}%)</span>`;
+            smokingResultElem.className = `text-xl font-bold ${report.smokingPrediction.isRisk ? 'text-red-500' : 'text-green-500'}`;
+            drinkingResultElem.innerHTML = `${report.drinkingPrediction.isRisk ? 'High Risk' : 'Low Risk'} <span class="text-sm text-gray-500">(${report.drinkingPrediction.probability.toFixed(1)}%)</span>`;
+            drinkingResultElem.className = `text-xl font-bold ${report.drinkingPrediction.isRisk ? 'text-red-500' : 'text-green-500'}`;
+        }
+
+        function displayMetricDetails(metricAnalysis) {
+            metricDetailsElem.innerHTML = '';
+            metricAnalysis.forEach((metric, index) => {
+                const statusColor = metric.status === 'Normal' ? 'text-green-600' : 'text-amber-600';
+                const item = document.createElement('li');
+                item.className = 'stagger-item flex justify-between items-center p-4 bg-gray-50 rounded-lg';
+                item.style.animationDelay = `${index * 100}ms`;
+                item.innerHTML = `
+                    <span class="font-medium text-gray-700">${metric.name}</span>
+                    <span class="font-bold ${statusColor}">${metric.value} (${metric.status})</span>
+                `;
+                metricDetailsElem.appendChild(item);
+            });
+        }
+
+        function displayInsights(insights, metricAnalysis) {
+            healthInsightsElem.innerHTML = '';
+            if(insights && insights.length > 0) {
+                 insights.forEach((insight, index) => {
+                    const item = document.createElement('li');
+                    item.className = 'stagger-item flex items-start p-3';
+                    item.style.animationDelay = `${(metricAnalysis.length + index) * 100}ms`;
+                    item.innerHTML = `
+                        <svg class="w-7 h-7 mr-4 mt-1 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="text-gray-700 text-base"><strong>${insight.topic}:</strong> ${insight.recommendation}</span>
+                    `;
+                    healthInsightsElem.appendChild(item);
+                });
+            }
+        }
+
+        function createOrUpdateRadarChart(metricData) {
+            const chartLabels = metricData.map(m => m.name);
+            const userValues = metricData.map(m => m.normalizedScore);
+
+            const chartConfig = {
+                type: 'radar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Your Health Profile',
+                        data: userValues,
+                        fill: true,
+                        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                        borderColor: 'rgb(79, 70, 229)',
+                        pointBackgroundColor: 'rgb(79, 70, 229)',
+                        pointBorderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { r: { angleLines: { color: 'rgba(0, 0, 0, 0.1)' }, grid: { color: 'rgba(0, 0, 0, 0.1)' }, pointLabels: { font: { size: 12 } }, min: 0, max: 100, ticks: { display: false, stepSize: 25 } } },
+                    plugins: { legend: { display: false } }
+                }
+            };
+
+            if (healthRadarChart) { healthRadarChart.data = chartConfig.data; healthRadarChart.update(); } 
+            else { healthRadarChart = new Chart(radarCanvas, chartConfig); }
+        }
+
+        function createOrUpdateBarChart(metricData) {
+            const riskMetrics = metricData.filter(m => ['Gamma-GTP', 'Triglyceride', 'Systolic', 'Fasting Blood Sugar', 'LDL Chole', 'Sgot Ast', 'Sgot Alt'].includes(m.name));
+            const chartLabels = riskMetrics.map(m => m.name);
+            const userValues = riskMetrics.map(m => m.value);
+            const normalRanges = riskMetrics.map(m => m.normalRange[1]); // Upper limit of normal
+
+            const chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: 'Your Value',
+                            data: userValues,
+                            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Normal Upper Limit',
+                            data: normalRanges,
+                            backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                            borderColor: 'rgba(34, 197, 94, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, title: { display: true, text: 'Metric Value' } } },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            };
+
+            if (riskFactorsBarChart) { riskFactorsBarChart.data = chartConfig.data; riskFactorsBarChart.update(); } 
+            else { riskFactorsBarChart = new Chart(barCanvas, chartConfig); }
+        }
+
+        function generatePDF(report) {
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const center = pageWidth / 2;
+            let currentY = 20;
+
+            // --- Header ---
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text("Personal Health Analysis Report", center, currentY, { align: "center" });
+            currentY += 10;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(14);
+            doc.text(`For: ${report.patientName}`, center, currentY, { align: "center" });
+            currentY += 6;
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, center, currentY, { align: "center" });
+            currentY += 15;
+
+            // --- Score and Predictions ---
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.setTextColor(0);
+            doc.text("Summary", 14, currentY);
+            doc.setLineWidth(0.5);
+            doc.line(14, currentY + 2, pageWidth - 14, currentY + 2);
+            currentY += 10;
+
+            doc.setFontSize(12);
+            doc.text(`Overall Health Score: ${report.healthScore} / 100`, 14, currentY);
+            doc.text(`Smoking Risk: ${report.smokingPrediction.isRisk ? 'High' : 'Low'} (${report.smokingPrediction.probability.toFixed(1)}%)`, 100, currentY);
+            currentY += 7;
+            doc.text(`Drinking Risk: ${report.drinkingPrediction.isRisk ? 'High' : 'Low'} (${report.drinkingPrediction.probability.toFixed(1)}%)`, 100, currentY);
+            currentY += 15;
+
+            // --- Charts ---
+            const barChartImg = barCanvas.toDataURL('image/png', 1.0);
+            const radarChartImg = radarCanvas.toDataURL('image/png', 1.0);
+            
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("Visual Analysis", 14, currentY);
+            doc.line(14, currentY + 2, pageWidth - 14, currentY + 2);
+            currentY += 10;
+
+            doc.addImage(barChartImg, 'PNG', 14, currentY, 180, 80);
+            currentY += 90;
+            doc.addImage(radarChartImg, 'PNG', 14, currentY, 90, 90);
+            
+            // --- Metric Details List ---
+            let listX = 115;
+            let listY = currentY;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.text("Metric Details:", listX, listY);
+            listY += 6;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            report.metricAnalysis.forEach(metric => {
+                doc.text(`- ${metric.name}: ${metric.value} (${metric.status})`, listX, listY);
+                listY += 5;
+                if (listY > 280) { // Page break
+                    doc.addPage();
+                    listY = 20;
+                }
+            });
+            doc.addPage();
+            currentY = 20;
+
+            // --- Recommendations ---
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("Personalized Recommendations", 14, currentY);
+            doc.line(14, currentY + 2, pageWidth - 14, currentY + 2);
+            currentY += 10;
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            report.insights.forEach(insight => {
+                doc.setFont("helvetica", "bold");
+                doc.text(`- ${insight.topic}:`, 14, currentY, { maxWidth: pageWidth - 28 });
+                doc.setFont("helvetica", "normal");
+                const splitText = doc.splitTextToSize(insight.recommendation, pageWidth - 28 - 5);
+                doc.text(splitText, 19, currentY + 4);
+                currentY += (splitText.length * 4) + 6;
+                if (currentY > 280) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+            });
+
+            // --- Footer ---
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text("Disclaimer: This report is generated for illustrative purposes and is not a substitute for professional medical advice.", center, 290, { align: 'center' });
+
+
+            doc.save(`${report.patientName}_Health_Report.pdf`);
+        }
+
+    </script>
+</body>
+</html>
